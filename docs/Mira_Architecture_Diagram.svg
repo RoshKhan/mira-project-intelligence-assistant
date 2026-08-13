@@ -1,0 +1,118 @@
+<svg viewBox="0 0 920 660" width="920" height="660" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+<title id="t">Mira agent architecture</title>
+<desc id="d">Router pattern: PM request or weekly schedule triggers an orchestrator that classifies intent, routes insufficient input to a clarification response, otherwise passes through a deterministic data preparation code node to one of four specialist agents, then a validation step, then a Markdown artefact reviewed by a PM. Langfuse traces every agent.</desc>
+
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+</marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+</marker>
+</defs>
+
+<style>
+.bx { fill: #f4f6f8; stroke: #cfd6dd; stroke-width: 1.2; rx: 6; }
+.gd { fill: #fdf4e3; stroke: #e0b872; stroke-width: 1.2; rx: 6; }
+.sp { fill: none; stroke: #cfd6dd; stroke-width: 1.2; stroke-dasharray: 4 3; rx: 6; }
+.tl { font: 600 13.5px system-ui, -apple-system, sans-serif; fill: #1a1a1a; }
+.st { font: 400 10.5px system-ui, -apple-system, sans-serif; fill: #6b6b6b; }
+.gt { font: 600 13.5px system-ui, -apple-system, sans-serif; fill: #b45309; }
+.gs { font: 400 10.5px system-ui, -apple-system, sans-serif; fill: #b45309; }
+.ln { stroke: #6b6b6b; stroke-width: 1.3; fill: none; }
+.lg { stroke: #b45309; stroke-width: 1.3; fill: none; stroke-dasharray: 5 3; }
+.cap { font: 500 10px system-ui, -apple-system, sans-serif; fill: #6b6b6b; }
+</style>
+
+<rect x="0" y="0" width="920" height="660" fill="#ffffff"/>
+
+<!-- triggers -->
+<rect class="bx" x="290" y="30" width="170" height="42"/>
+<text class="tl" x="375" y="49" text-anchor="middle">PM Request</text>
+<text class="st" x="375" y="63" text-anchor="middle">chat / form input</text>
+
+<rect class="bx" x="490" y="30" width="170" height="42"/>
+<text class="tl" x="575" y="49" text-anchor="middle">Weekly Schedule</text>
+<text class="st" x="575" y="63" text-anchor="middle">cron trigger</text>
+
+<path class="ln" d="M375,72 L375,92 L440,92 L440,110" marker-end="url(#a)"/>
+<path class="ln" d="M575,72 L575,92 L500,92 L500,110" marker-end="url(#a)"/>
+
+<!-- router -->
+<rect class="bx" x="230" y="112" width="440" height="50"/>
+<text class="tl" x="450" y="133" text-anchor="middle">Orchestrator / Router</text>
+<text class="st" x="450" y="149" text-anchor="middle">classifies intent &#8594; plan &#183; risk &#183; status &#183; milestone</text>
+
+<!-- refusal -->
+<rect class="gd" x="700" y="112" width="190" height="50"/>
+<text class="gt" x="795" y="133" text-anchor="middle">INSUFFICIENT_INPUT</text>
+<text class="gs" x="795" y="149" text-anchor="middle">names missing fields</text>
+<path class="lg" d="M670,137 L698,137" marker-end="url(#ag)"/>
+<text class="cap" x="684" y="106" text-anchor="middle">no data</text>
+
+<!-- sources -->
+<rect class="sp" x="30" y="176" width="172" height="86"/>
+<text class="tl" x="116" y="196" text-anchor="middle">Source Files</text>
+<text class="st" x="116" y="212" text-anchor="middle">read-only &#183; no writes</text>
+<text class="st" x="116" y="228" text-anchor="middle">description &#183; timeline</text>
+<text class="st" x="116" y="243" text-anchor="middle">risks &#183; task board</text>
+
+<!-- data prep -->
+<rect class="bx" x="230" y="190" width="560" height="52"/>
+<text class="tl" x="510" y="211" text-anchor="middle">Data Prep &#8212; Code Node (no LLM)</text>
+<text class="st" x="510" y="228" text-anchor="middle">counts &#183; date deltas &#183; sprint filters, computed deterministically</text>
+
+<path class="ln" d="M202,216 L228,216" marker-end="url(#a)"/>
+<path class="ln" d="M450,162 L450,188" marker-end="url(#a)"/>
+
+<!-- agents -->
+<rect class="bx" x="30" y="290" width="200" height="72"/>
+<text class="tl" x="130" y="316" text-anchor="middle">Planner Agent</text>
+<text class="st" x="130" y="333" text-anchor="middle">phases, milestones,</text>
+<text class="st" x="130" y="347" text-anchor="middle">deliverables</text>
+
+<rect class="bx" x="250" y="290" width="200" height="72"/>
+<text class="tl" x="350" y="316" text-anchor="middle">Risk Assessor</text>
+<text class="st" x="350" y="333" text-anchor="middle">categorized matrix</text>
+<text class="st" x="350" y="347" text-anchor="middle">with mitigations</text>
+
+<rect class="bx" x="470" y="290" width="200" height="72"/>
+<text class="tl" x="570" y="316" text-anchor="middle">Status Reporter</text>
+<text class="st" x="570" y="333" text-anchor="middle">counts, blockers,</text>
+<text class="st" x="570" y="347" text-anchor="middle">health</text>
+
+<rect class="bx" x="690" y="290" width="200" height="72"/>
+<text class="tl" x="790" y="316" text-anchor="middle">Milestone Tracker</text>
+<text class="st" x="790" y="333" text-anchor="middle">at-risk alerts,</text>
+<text class="st" x="790" y="347" text-anchor="middle">suggested actions</text>
+
+<path class="ln" d="M510,242 L510,266 L130,266 L130,288" marker-end="url(#a)"/>
+<path class="ln" d="M350,266 L350,288" marker-end="url(#a)"/>
+<path class="ln" d="M570,266 L570,288" marker-end="url(#a)"/>
+<path class="ln" d="M510,266 L790,266 L790,288" marker-end="url(#a)"/>
+
+<!-- validation -->
+<rect class="gd" x="230" y="410" width="460" height="50"/>
+<text class="gt" x="460" y="431" text-anchor="middle">Validation &#8212; Fail Closed</text>
+<text class="gs" x="460" y="447" text-anchor="middle">every cited source ID must exist in the files</text>
+
+<path class="ln" d="M130,362 L130,386 L460,386 L460,408" marker-end="url(#a)"/>
+<path class="ln" d="M350,362 L350,386" marker-end="url(#a)"/>
+<path class="ln" d="M570,362 L570,386" marker-end="url(#a)"/>
+<path class="ln" d="M790,362 L790,386 L460,386" marker-end="url(#a)"/>
+
+<!-- output -->
+<rect class="bx" x="230" y="500" width="460" height="52"/>
+<text class="tl" x="460" y="521" text-anchor="middle">Markdown Artefact &#8594; PM Review</text>
+<text class="st" x="460" y="538" text-anchor="middle">human-in-the-loop before anything reaches the client</text>
+<path class="ln" d="M460,460 L460,498" marker-end="url(#a)"/>
+
+<!-- observability -->
+<rect class="sp" x="30" y="588" width="860" height="42"/>
+<text class="tl" x="460" y="608" text-anchor="middle">Langfuse &#8212; Observability</text>
+<text class="st" x="460" y="623" text-anchor="middle">per-agent input, output, token usage, latency, cost</text>
+
+<!-- legend -->
+<rect class="gd" x="34" y="428" width="10" height="10"/>
+<text class="cap" x="50" y="437">amber = grounding guardrail</text>
+</svg>
