@@ -37,16 +37,36 @@ function addWeeks(anchorISO, weeks) {
   return iso(d);
 }
 
-// Read overrides passed in from an upstream Set node, if present.
-const incoming = $input.first()?.json ?? {};
-const referenceDate = incoming.referenceDate || CONFIG.referenceDate;
-const projectStartAnchor = incoming.projectStartAnchor || CONFIG.projectStartAnchor;
-const horizonDays = Number(incoming.horizonDays ?? CONFIG.horizonDays);
-const sprintFilter = incoming.sprint || null;
+// ---------- overrides ----------
+// Overrides are read by scanning every incoming item for RESERVED field
+// names: filterSprint, refDate, startAnchor, horizonDays. Reserved names
+// (not "sprint", "referenceDate", etc.) are used deliberately so an override
+// can be attached directly onto real data rows — e.g. via an Edit Fields
+// node applied to all 25 task rows — without colliding with a task's own
+// `sprint` column or requiring a separate config-only item.
+//
+// An earlier version tried to detect "is this item data or config" by
+// shape (does it have task_id?). That broke as soon as the override was
+// attached to data rows instead of arriving separately, and a same-named
+// field would have silently overwritten every task's real sprint value.
+// Reserved, non-colliding names remove the ambiguity entirely.
+const rawItems = $input.all().map((i) => i.json);
+const override = {};
+for (const item of rawItems) {
+  if (item.filterSprint !== undefined && item.filterSprint !== '') override.sprint = item.filterSprint;
+  if (item.refDate !== undefined && item.refDate !== '') override.referenceDate = item.refDate;
+  if (item.startAnchor !== undefined && item.startAnchor !== '') override.projectStartAnchor = item.startAnchor;
+  if (item.horizonDays !== undefined && item.horizonDays !== '') override.horizonDays = item.horizonDays;
+}
+
+const referenceDate = override.referenceDate || CONFIG.referenceDate;
+const projectStartAnchor = override.projectStartAnchor || CONFIG.projectStartAnchor;
+const horizonDays = Number(override.horizonDays ?? CONFIG.horizonDays);
+const sprintFilter = override.sprint || null;
 
 // ---------- collect rows ----------
 // Accepts rows from any upstream CSV parse. Detects type by columns present.
-const all = $input.all().map((i) => i.json);
+const all = rawItems;
 
 const tasks = all.filter((r) => r && r.task_id);
 const phases = all.filter((r) => r && r.phase && r.phase_name);
@@ -55,16 +75,27 @@ const risks = all.filter((r) => r && r.risk_id);
 // ---------- task aggregates ----------
 const norm = (s) => String(s || '').trim();
 
+// When a sprint filter is set, EVERY downstream aggregate (counts, status
+// lists, blocked, overdue) must be computed from the sprint-scoped list, not
+// the whole board. Leaving this to the agent's prompt is what caused the
+// original T5 failure: the model defaulted to the always-present whole-board
+// data instead of the sprint-specific structure. Scoping is now enforced
+// here, in code, so the correct set of tasks is the *only* one the agent
+// ever sees under `tasks_by_status`.
+const scopedTasks = sprintFilter
+  ? tasks.filter((t) => norm(t.sprint) === norm(sprintFilter))
+  : tasks;
+
 const counts = { Done: 0, 'In Progress': 0, 'To Do': 0, Blocked: 0 };
-for (const t of tasks) {
+for (const t of scopedTasks) {
   const s = norm(t.status);
   if (counts[s] === undefined) counts[s] = 0;
   counts[s] += 1;
 }
-counts.Total = tasks.length;
+counts.Total = scopedTasks.length;
 
 const byStatus = (status) =>
-  tasks
+  scopedTasks
     .filter((t) => norm(t.status) === status)
     .map((t) => ({
       task_id: t.task_id,
@@ -75,7 +106,7 @@ const byStatus = (status) =>
     }));
 
 // Blocked: reason is taken verbatim from the description, never inferred.
-const blocked = tasks
+const blocked = scopedTasks
   .filter((t) => norm(t.status) === 'Blocked')
   .map((t) => {
     const desc = String(t.description || '');
@@ -91,7 +122,7 @@ const blocked = tasks
   });
 
 // Overdue: open work whose due date has passed as of the reference date.
-const overdue = tasks
+const overdue = scopedTasks
   .filter((t) => {
     const s = norm(t.status);
     if (s === 'Done' || !t.due_date) return false;
