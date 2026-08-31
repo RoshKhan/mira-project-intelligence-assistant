@@ -156,18 +156,9 @@ and return only N rows.
 
 GLOBAL RULES: [insert the four global rules here]
 
-ADDITIONAL RULES:
-1. Every risk MUST come from the supplied risk register, or be explicitly evidenced by a
-   sentence in the project description. Cite which.
-2. Do NOT add generic risks common to AI or software projects. If the register has 10 risks,
-   do not return 12. A generic risk with no source is a failure, not added value.
-3. Do NOT invent severity or probability scores unless CONTEXT supplies them.
-4. Preserve the register's own category names. Do not rename or merge categories.
-5. Impact and mitigation text should reflect CONTEXT. You may condense; you may not add
-   new claims.
-
-INSUFFICIENT INPUT RULE: If CONTEXT contains no risk register AND no project description with
-substantive detail, return EXACTLY:
+INSUFFICIENT INPUT RULE (check this FIRST, before anything else in this prompt): If CONTEXT
+contains no risk register AND no project description with substantive detail, your entire
+response must be exactly these six lines, with none omitted:
 
 INSUFFICIENT_INPUT
 To generate a risk assessment I need:
@@ -177,7 +168,20 @@ To generate a risk assessment I need:
 - Existing risk register, if one exists
 Please supply these and I will produce the matrix.
 
-Return nothing else. Do not list generic project risks.
+A response consisting of the single word INSUFFICIENT_INPUT with nothing else is incomplete
+and incorrect — you must include the full explanatory text above. Return nothing else beyond
+these six lines. Do not list generic project risks. Only once you have confirmed CONTEXT
+contains sufficient detail should you proceed to the rules below.
+
+ADDITIONAL RULES:
+1. Every risk MUST come from the supplied risk register, or be explicitly evidenced by a
+   sentence in the project description. Cite which.
+2. Do NOT add generic risks common to AI or software projects. If the register has 10 risks,
+   do not return 12. A generic risk with no source is a failure, not added value.
+3. Do NOT invent severity or probability scores unless CONTEXT supplies them.
+4. Preserve the register's own category names. Do not rename or merge categories.
+5. Impact and mitigation text should reflect CONTEXT. You may condense; you may not add
+   new claims.
 ```
 
 ---

@@ -11,11 +11,11 @@ Rubric: Q2 "Baseline dataset tested with results" — 5 points.
 |---|---|---|
 | T1 | Plan (detailed) | **PASS** |
 | T2 | Plan (vague) | **PASS** |
-| T3 | Risk (detailed) | Not yet run |
-| T4 | Risk (vague) | Not yet run |
+| T3 | Risk (detailed) | **PASS** |
+| T4 | Risk (vague) | **PASS** (1 fix — see notes) |
 | T5 | Status (data) | **PASS** (1 retry — see notes) |
 | T6 | Status (no data) | **PASS** |
-| T7 | Risk analysis | Not yet run |
+| T7 | Risk analysis | **PASS** (see flagged concern) |
 | T8 | Tracking | **PASS** |
 | T9 | Plan (edge) | Not yet run |
 | T10 | Status summary | **PASS** |
@@ -140,14 +140,36 @@ generic risks unrelated to the project.
 
 **Output**
 ```
-[paste output here]
+## Risk Assessment: AI Adoption Project at ABCDE Ltd.
+
+| ID | Category | Risk | Potential Impact | Mitigation | Source |
+|---|---|---|---|---|---|
+| R01 | Data Quality & Availability | Incomplete or unstructured data | Poor model performance and inaccurate outcomes | Perform early data audits and implement robust data governance | project_risks.csv Row 1 |
+| R02 | Integration Issues | Difficulty integrating AI with legacy systems | Delays in deployment and operational disruptions | Plan integration roadmap and use APIs/middleware | project_risks.csv Row 2 |
+| R03 | Talent & Skills Gap | Lack of internal AI/ML expertise | Overreliance on external vendors and slow progress | Provide staff training and hire specialized talent | project_risks.csv Row 3 |
+| R04 | Change Resistance | Employees resist adopting AI-driven workflows | Low adoption and reduced ROI | Strong change management and early engagement | project_risks.csv Row 4 |
+| R05 | Ethical & Legal Concerns | Risks of biased models or data privacy violations | Legal repercussions and reputational damage | Involve legal early and implement fairness checks | project_risks.csv Row 5 |
+| R06 | Cost Overruns | Underestimation of AI development costs | Budget constraints and project delays | Set realistic budget and build in contingency funds | project_risks.csv Row 6 |
+| R07 | Unrealistic Expectations | Stakeholders expect immediate ROI | Disillusionment and loss of support | Align expectations and show quick wins | project_risks.csv Row 7 |
+| R08 | Model Performance Drift | AI models lose accuracy over time | Incorrect decisions and trust erosion | Regular retraining cycles and monitoring dashboards | project_risks.csv Row 8 |
+| R09 | Security Vulnerabilities | AI models targeted by adversarial attacks | Data breaches and operational risks | Adopt AI security best practices and penetration testing | project_risks.csv Row 9 |
+| R10 | Vendor Lock-in | Overdependence on a specific AI platform | Flexibility loss and future switching costs | Favor open standards and negotiate flexible vendor terms | project_risks.csv Row 10 |
+
+**Coverage note:** All supplied categories represented
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Yes — all 10 risks present (R01–R10), each with category,
+impact, and mitigation matching `project_risks.csv` verbatim. All risks are logistics/AI
+relevant; nothing generic added.
 
-**Hallucination detected?**
+**Hallucination detected?** No. No risk beyond the 10 supplied. No invented severity or
+probability scores.
 
-**Pass/Fail:**
+**Pass/Fail:** **PASS**
+
+**Minor note.** Source citations read "project_risks.csv Row N" rather than the requested
+`project_risks.csv R01` format — still fully traceable, just a formatting deviation from the
+prompt spec. Not worth a re-run; would tighten in a second pass if time allows.
 
 ---
 
@@ -161,16 +183,44 @@ REQUEST: Generate a risk assessment for: "New project starting soon."
 **Expected output must contain:** must flag as insufficient; must ask for project details;
 must NOT invent project-specific risks from nothing.
 
-**Output**
+**Output — first attempt**
 ```
-[paste output here]
+INSUFFICIENT_INPUT
+```
+Bare keyword only — none of the specified follow-up text came through, despite the System
+Message specifying that exact block verbatim. Reproduced identically on a second run
+(confirmed in Table view, ruling out a display artefact), so this was a genuine, consistent
+prompt gap rather than one-off model noise.
+
+**Root cause.** The INSUFFICIENT INPUT RULE sat after five ADDITIONAL RULES in the system
+message — a longer instruction stack than the Planner's, which has only four ADDITIONAL RULES
+before its own refusal block. The model complied with "flag as insufficient" but dropped the
+specific follow-up text positioned further down the prompt.
+
+**Fix applied.** Moved the INSUFFICIENT INPUT RULE to immediately after GLOBAL RULES, ahead of
+all ADDITIONAL RULES, and added an explicit line: "A response consisting of the single word
+INSUFFICIENT_INPUT with nothing else is incomplete and incorrect." Updated in
+`docs/Mira_Agent_System_Prompts.md`.
+
+**Output — after fix**
+```
+INSUFFICIENT_INPUT
+To generate a risk assessment I need:
+- Project scope and objectives
+- Domain and delivery approach
+- Timeline and key dependencies
+- Existing risk register, if one exists
+
+Please supply these and I will produce the matrix.
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Yes — full refusal text now present, matching spec.
 
-**Hallucination detected?**
+**Hallucination detected?** No, on either attempt. No project-specific risk was ever invented
+from a one-line input — the failure mode was incompleteness of the refusal message, not
+fabrication.
 
-**Pass/Fail:**
+**Pass/Fail:** **PASS** (after one documented fix)
 
 ---
 
@@ -295,14 +345,35 @@ REQUEST: What are the top 3 risks for the ABCDE Ltd project?
 
 **Output**
 ```
-[paste output here]
+## Risk Assessment: AI Adoption Project for ABCDE Ltd
+
+| ID | Category | Risk | Potential Impact | Mitigation | Source |
+|---|---|---|---|---|---|
+| R01 | Data Quality & Availability | Incomplete or unstructured data | Poor model performance and inaccurate outcomes | Perform early data audits and implement robust data governance | Project Risks |
+| R02 | Integration Issues | Difficulty integrating AI with legacy systems | Delays in deployment and operational disruptions | Plan integration roadmap and use APIs/middleware | Project Risks |
+| R03 | Talent & Skills Gap | Lack of internal AI/ML expertise | Overreliance on external vendors and slow progress | Provide staff training and hire specialized talent | Project Risks |
+
+**Coverage note:** All supplied categories represented
+**Ranking basis:** Risks are ranked based on potential impact.
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Yes on the literal criteria — exactly 3 risks returned, all
+drawn from the register (R01–R03), a ranking basis stated, no risk outside R01–R10.
 
-**Hallucination detected?**
+**Hallucination detected?** No fabricated risks.
 
-**Pass/Fail:**
+**Pass/Fail:** **PASS**, with a flagged concern.
+
+**Concern worth recording.** The three selected are simply the first three rows in file
+order (R01, R02, R03), and "ranked based on potential impact" does not explain why these
+three outrank the other seven — several of which plausibly carry comparable or greater
+impact (R05 legal/reputational exposure, R09 security breaches). Since `project_risks.csv`
+has no numeric severity or probability field, "top 3 by impact" is an inherently subjective
+judgment, and this output reads more like positional default than demonstrated reasoning.
+Not a hallucination — nothing invented — but a shallow answer to a ranking question. Worth
+noting in Q4 as a limitation: without a quantified severity field in the source data, ranking
+tasks can't be verified as reasoned rather than coincidental, and this is itself an argument
+for adding a severity score to the risk register in a v2.
 
 ---
 
@@ -520,9 +591,9 @@ include Sprint 3+ tasks.
 
 | Metric | Result |
 |---|---|
-| Tests passed | 6 / 12 (6 pending) |
+| Tests passed | 9 / 12 (3 pending) |
 | Hallucinations detected | 0 |
-| Refusal cases correct | 2 / 2 so far (T2, T6 pass; T4, T9 pending) |
+| Refusal cases correct | 3 / 3 so far (T2, T4, T6 pass; T9 pending) |
 | Count accuracy | 100% on T5 and T10 |
 
 ## Fixes applied during evaluation
@@ -532,3 +603,4 @@ include Sprint 3+ tasks.
 | 1 | Identical prompt produced differing goal lists across runs | Planner | Temperature lowered to 0.2 | Pending re-test |
 | 2 | Config overrides read from first input item; a task row's `sprint` column was mistaken for a sprint filter, producing a report whose header, task list and counts disagreed | Data Prep (code, not LLM) | Override reader now ignores the first item when it carries `task_id`, `phase` or `risk_id` | Re-tested — T10 passes, scope correct, all 5 completed tasks listed |
 | 3 | Sprint scoping (T5) failed: header said "Sprint 3" but every task list was the whole 25-task board. Cause was two-fold — (a) the fix-#2 guard blocked the override once it was attached directly to data rows via an Edit Fields node, and (b) the override field was named `sprint`, identical to each task's own real column, which would have overwritten the source data it needed to filter against | Data Prep (code, not LLM) | Replaced shape-based guessing with reserved, non-colliding override field names (`filterSprint`, `refDate`, `startAnchor`, `horizonDays`) scanned across all items rather than just the first | Re-tested — counts exact (0/2/2/0/4), only in-scope tasks named. Minor completeness gap noted separately (T008/T009 counted but not individually listed) |
+| 4 | Risk Assessor's refusal (T4) returned only the bare word `INSUFFICIENT_INPUT`, dropping the required follow-up text — reproduced identically on a second run | Risk Assessor | Moved the INSUFFICIENT INPUT RULE to immediately after GLOBAL RULES instead of after five ADDITIONAL RULES, and added an explicit line barring a single-word response | Re-tested — full six-line refusal returned correctly |
