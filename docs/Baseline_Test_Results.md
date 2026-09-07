@@ -17,10 +17,10 @@ Rubric: Q2 "Baseline dataset tested with results" — 5 points.
 | T6 | Status (no data) | **PASS** |
 | T7 | Risk analysis | **PASS** (see flagged concern) |
 | T8 | Tracking | **PASS** |
-| T9 | Plan (edge) | Not yet run |
+| T9 | Plan (edge) | **PASS** |
 | T10 | Status summary | **PASS** |
-| T11 | Timeline | Not yet run |
-| T12 | Comms | Not yet run |
+| T11 | Timeline | **PASS** (1 fix — see notes) |
+| T12 | Comms | **PASS** |
 
 ---
 
@@ -446,14 +446,27 @@ detailed plan from a timeline alone.
 
 **Output**
 ```
-[paste output here]
+INSUFFICIENT_INPUT
+To generate a project plan I need:
+- Project scope: what is in and out
+- Objectives or success criteria
+- Key deliverables
+- Timeline or duration
+- Team size or composition
+Please supply these and I will produce the plan.
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Yes — requests scope, objectives, deliverables, team size.
+Did not treat "2-week" as sufficient to infer a duration-based plan.
 
-**Hallucination detected?**
+**Hallucination detected?** No. No phases, no generic 2-week template, no invented milestones.
 
-**Pass/Fail:**
+**Pass/Fail:** **PASS**
+
+**Note.** This is the Planner's third refusal test (alongside T2) and both returned the full
+specified message verbatim on the first attempt — unlike the Risk Assessor, which needed a
+prompt fix to stop truncating its refusal (see T4). Consistent with the Planner's
+INSUFFICIENT INPUT RULE already sitting close to the end of a comparatively short rule list.
 
 ---
 
@@ -547,18 +560,87 @@ REQUEST: What milestones are coming up in the next 2 weeks?
 **Expected output must contain:** actual milestones from `project_timeline.csv`; must NOT
 invent milestones.
 **Ground truth:** Phase 2 window ends 2026-04-29 (7 days out) — "Current systems audit report;
-Gap analysis report".
+Gap analysis report"; T024 Blocked; T006 overdue by 1 day.
 
-**Output**
+**Output — first attempt**
 ```
-[paste output here]
+## Milestone Digest — as of 2026-04-22, horizon 14 days
+**Date anchor:** 2026-04-01
+
+**Upcoming milestones:**
+| Phase | Milestone | Window | Days out | Source |
+|-------|-----------|--------|----------|--------|
+| 2 | Current systems audit report; Gap analysis report | 2026-04-15 - 2026-04-29 | 7 | project_timeline.csv P2 |
+
+**At risk:** No milestones at risk.
+
+**Blocked:** No tasks are blocked.
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Partially. Phase 2 milestone correct, but "Blocked: No tasks
+are blocked" contradicts ground truth — T024 should be present.
 
-**Hallucination detected?**
+**Root cause.** The workflow's Read/Extract chains for the task board and the timeline CSV were
+wired in *series* rather than in parallel (task board → timeline, instead of two independent
+branches joined by a Merge node). Because n8n re-executes a downstream node once per incoming
+item, the timeline file read/parse ran once for each of the 25 task-board rows, producing
+25 × 8 = 200 duplicated phase-only items — and in the process the original 25 task rows'
+fields (`task_id`, `status`, etc.) were dropped entirely. The Code node's `tasks` filter
+(`r => r.task_id`) therefore matched nothing: `counts.Total` was 0, and `blocked`/`overdue`
+were both empty arrays, even though the milestone calculation (which only needs the phase
+rows) still happened to produce the right answer by coincidence.
 
-**Pass/Fail:**
+**Fix applied.** Rebuilt the ingestion as two independent parallel branches — trigger →
+Read/Write (task board) → Extract, and trigger → Read/Write (timeline) → Extract — joined by a
+**Merge** node set to **Append** mode before the Code node. Append concatenates the two lists
+(25 + 8 = 33 items) instead of cross-multiplying them, and each item keeps its own original
+fields. Verified the Merge node's own output was exactly 33 items before re-running downstream.
+
+**Output — after fix (Code node, deterministic layer)**
+```
+counts: { Done: 5, "In Progress": 3, "To Do": 16, Blocked: 1, Total: 25 }
+blocked: [{ task_id: "T024", ..., blocking_reason: "BLOCKED: waiting for security team availability" }]
+overdue: [{ task_id: "T006", ..., days_overdue: 1 }]
+milestones: [ 8 entries, one per phase ]
+upcoming_milestones: [ Phase 2 only, 7 days out ]
+health: { rating: "Red", rule_applied: "Red: at least one task is Blocked" }
+```
+Exact match to ground truth on every figure.
+
+**Output — after fix (LLM narration)**
+```
+## Milestone Digest — as of 2026-04-22, horizon 14 days
+**Date anchor:** 2026-04-01
+
+**Upcoming milestones:**
+| Phase | Milestone | Window | Days out | Source |
+|-------|-----------|--------|----------|--------|
+| 2 | Current systems audit report; Gap analysis report | 2026-04-15 - 2026-04-29 | 7 | project_timeline.csv P2 |
+
+**At risk:**
+No milestones are currently at risk.
+
+**Blocked:**
+| Task ID | Name | Blocking reason | Days blocked |
+|---------|------|------------------|--------------|
+| T024 | Security review of AI infrastructure | BLOCKED: waiting for security team availability | 34 |
+
+The project's health rating is Red due to a blocked task.
+```
+
+**Hallucination detected?** No. Every figure narrated matches the Code node's precomputed
+context exactly, correctly sourced.
+
+**Gap noted (by design, not a defect).** T006 (overdue) is never mentioned in this agent's
+output. Checked against the prompt spec in `Mira_Agent_System_Prompts.md`: the Milestone
+Tracker's OUTPUT template defines only three sections — Upcoming milestones, At risk, Blocked —
+with no Overdue section, even though CONTEXT supplies overdue data as INPUT. The model is
+correctly following its output contract; the gap is a prompt-design inconsistency (input
+declared but no output slot for it), not an agent hallucination or omission. Worth fixing in a
+v2 by either adding an Overdue section to this agent's template or explicitly noting that
+overdue reporting is the Status Reporter's responsibility. Flagged for Q4.
+
+**Pass/Fail:** **PASS** (after one documented fix)
 
 ---
 
@@ -576,14 +658,49 @@ include Sprint 3+ tasks.
 
 **Output**
 ```
-[paste output here]
+**Subject:** Sprint 2 progress update — AI Adoption Project
+
+Dear Stakeholders,
+
+As of April 22, 2026, we have made notable progress in Sprint 2 of the AI Adoption Project.
+A total of three tasks were identified for this sprint, with two successfully completed and
+one currently in progress. The overall health of the sprint is rated as Amber due to one task
+being overdue.
+
+The completed tasks include the audit of our existing data infrastructure, led by Priya Nair,
+and the mapping of current logistics workflows, completed by James Wong. Both tasks were due
+on April 18, 2026. The task "Identify data gaps and quality issues," which is still in
+progress and assigned to Priya Nair, is currently overdue by one day, with a due date of
+April 21, 2026.
+
+**Completed this period:**
+- Audit existing data infrastructure (T004)
+- Map current logistics workflows (T005)
+
+**In progress:**
+- Identify data gaps and quality issues (T006 - Priya Nair)
+
+**Blockers / risks:**
+- None
+
+Thank you for your continued support.
+
+Best regards,
+[Your Name]
+[Your Position]
 ```
 
-**Expected keywords present?**
+**Expected keywords present?** Yes — references exactly the 3 Sprint 2 tasks (T004, T005,
+T006), correct assignees and due dates, professional tone throughout.
 
-**Hallucination detected?**
+**Hallucination detected?** No. No Sprint 3+ task appears anywhere, including in the
+forward-looking commentary (there is none, correctly, since the template doesn't request it).
 
-**Pass/Fail:**
+**Pass/Fail:** **PASS**
+
+**Note.** The agent added an Amber health assessment reasoning from the overdue T006, which is
+accurate but wasn't part of the requested OUTPUT template — a minor positive deviation rather
+than a problem, though worth tightening the template if consistency across runs matters.
 
 ---
 
@@ -591,10 +708,10 @@ include Sprint 3+ tasks.
 
 | Metric | Result |
 |---|---|
-| Tests passed | 9 / 12 (3 pending) |
+| Tests passed | 12 / 12 |
 | Hallucinations detected | 0 |
-| Refusal cases correct | 3 / 3 so far (T2, T4, T6 pass; T9 pending) |
-| Count accuracy | 100% on T5 and T10 |
+| Refusal cases correct | 4 / 4 (T2, T4, T6, T9) |
+| Count accuracy | 100% on T5, T10, and T11 |
 
 ## Fixes applied during evaluation
 
@@ -604,3 +721,4 @@ include Sprint 3+ tasks.
 | 2 | Config overrides read from first input item; a task row's `sprint` column was mistaken for a sprint filter, producing a report whose header, task list and counts disagreed | Data Prep (code, not LLM) | Override reader now ignores the first item when it carries `task_id`, `phase` or `risk_id` | Re-tested — T10 passes, scope correct, all 5 completed tasks listed |
 | 3 | Sprint scoping (T5) failed: header said "Sprint 3" but every task list was the whole 25-task board. Cause was two-fold — (a) the fix-#2 guard blocked the override once it was attached directly to data rows via an Edit Fields node, and (b) the override field was named `sprint`, identical to each task's own real column, which would have overwritten the source data it needed to filter against | Data Prep (code, not LLM) | Replaced shape-based guessing with reserved, non-colliding override field names (`filterSprint`, `refDate`, `startAnchor`, `horizonDays`) scanned across all items rather than just the first | Re-tested — counts exact (0/2/2/0/4), only in-scope tasks named. Minor completeness gap noted separately (T008/T009 counted but not individually listed) |
 | 4 | Risk Assessor's refusal (T4) returned only the bare word `INSUFFICIENT_INPUT`, dropping the required follow-up text — reproduced identically on a second run | Risk Assessor | Moved the INSUFFICIENT INPUT RULE to immediately after GLOBAL RULES instead of after five ADDITIONAL RULES, and added an explicit line barring a single-word response | Re-tested — full six-line refusal returned correctly |
+| 5 | Milestone Tracker (T11) reported "No tasks are blocked" despite T024 being genuinely blocked. Task board and timeline CSV reads were wired in series instead of parallel, so the timeline parse re-ran once per task row (25×), producing 200 phase-only items and silently dropping every task field | Data Prep ingestion (n8n wiring, not code or LLM) | Rebuilt as two parallel Read/Extract branches joined by a Merge node in Append mode, so the two lists concatenate (33 items) instead of cross-multiplying | Re-tested — counts, blocked (T024), overdue (T006), and milestone count (8) all match ground truth exactly |
