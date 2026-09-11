@@ -1,0 +1,251 @@
+{
+  "name": "Mira — Milestone Tracker",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        -112
+      ],
+      "id": "f5776387-b90f-4bf7-8c77-b2058a770b12",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/sample_task_board.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        -112
+      ],
+      "id": "cd61f243-61f6-4b4d-b078-9f16c508eb1a",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        -112
+      ],
+      "id": "65e3028c-cfd0-43ba-9a08-a32751c50832",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Mira — Data Prep (n8n Code node, \"Run Once for All Items\")\n * ---------------------------------------------------------\n * Computes EVERY figure the agents are allowed to state: status counts,\n * sprint filters, blocked items, overdue items, milestone windows.\n *\n * No LLM touches arithmetic. Agents narrate these values only.\n * This is what makes T5, T8, T10, T11 and T12 correct by construction.\n *\n * INPUT  : items containing parsed CSV rows (task board, timeline, risks)\n *          plus optional { referenceDate, projectStartAnchor, sprint, horizonDays }\n * OUTPUT : one item, { context } — paste into the agent prompt as the CONTEXT block\n */\n\n// ---------- configuration (declare, never infer) ----------\nconst CONFIG = {\n  // Reference \"today\". The task board implies late April 2026:\n  // Sprint 2 complete, Sprint 3 in progress, T006 (due 2026-04-21) still open.\n  referenceDate: '2026-04-22',\n\n  // Timeline uses relative week numbers; task board uses absolute dates.\n  // No join key exists, so the anchor MUST be declared. BRD assumption A-2.\n  projectStartAnchor: '2026-04-01',\n\n  horizonDays: 14,\n};\n\n// ---------- helpers ----------\nconst toDate = (s) => (s ? new Date(String(s).trim() + 'T00:00:00Z') : null);\nconst DAY_MS = 86400000;\nconst daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / DAY_MS);\nconst iso = (d) => d.toISOString().slice(0, 10);\n\nfunction addWeeks(anchorISO, weeks) {\n  const d = toDate(anchorISO);\n  d.setUTCDate(d.getUTCDate() + weeks * 7);\n  return iso(d);\n}\n\n// ---------- overrides ----------\n// Overrides are read by scanning every incoming item for RESERVED field\n// names: filterSprint, refDate, startAnchor, horizonDays. Reserved names\n// (not \"sprint\", \"referenceDate\", etc.) are used deliberately so an override\n// can be attached directly onto real data rows — e.g. via an Edit Fields\n// node applied to all 25 task rows — without colliding with a task's own\n// `sprint` column or requiring a separate config-only item.\n//\n// An earlier version tried to detect \"is this item data or config\" by\n// shape (does it have task_id?). That broke as soon as the override was\n// attached to data rows instead of arriving separately, and a same-named\n// field would have silently overwritten every task's real sprint value.\n// Reserved, non-colliding names remove the ambiguity entirely.\nconst rawItems = $input.all().map((i) => i.json);\nconst override = {};\nfor (const item of rawItems) {\n  if (item.filterSprint !== undefined && item.filterSprint !== '') override.sprint = item.filterSprint;\n  if (item.refDate !== undefined && item.refDate !== '') override.referenceDate = item.refDate;\n  if (item.startAnchor !== undefined && item.startAnchor !== '') override.projectStartAnchor = item.startAnchor;\n  if (item.horizonDays !== undefined && item.horizonDays !== '') override.horizonDays = item.horizonDays;\n}\n\nconst referenceDate = override.referenceDate || CONFIG.referenceDate;\nconst projectStartAnchor = override.projectStartAnchor || CONFIG.projectStartAnchor;\nconst horizonDays = Number(override.horizonDays ?? CONFIG.horizonDays);\nconst sprintFilter = override.sprint || null;\n\n// ---------- collect rows ----------\n// Accepts rows from any upstream CSV parse. Detects type by columns present.\nconst all = rawItems;\n\nconst tasks = all.filter((r) => r && r.task_id);\nconst phases = all.filter((r) => r && r.phase && r.phase_name);\nconst risks = all.filter((r) => r && r.risk_id);\n\n// ---------- task aggregates ----------\nconst norm = (s) => String(s || '').trim();\n\n// When a sprint filter is set, EVERY downstream aggregate (counts, status\n// lists, blocked, overdue) must be computed from the sprint-scoped list, not\n// the whole board. Leaving this to the agent's prompt is what caused the\n// original T5 failure: the model defaulted to the always-present whole-board\n// data instead of the sprint-specific structure. Scoping is now enforced\n// here, in code, so the correct set of tasks is the *only* one the agent\n// ever sees under `tasks_by_status`.\nconst scopedTasks = sprintFilter\n  ? tasks.filter((t) => norm(t.sprint) === norm(sprintFilter))\n  : tasks;\n\nconst counts = { Done: 0, 'In Progress': 0, 'To Do': 0, Blocked: 0 };\nfor (const t of scopedTasks) {\n  const s = norm(t.status);\n  if (counts[s] === undefined) counts[s] = 0;\n  counts[s] += 1;\n}\ncounts.Total = scopedTasks.length;\n\nconst byStatus = (status) =>\n  scopedTasks\n    .filter((t) => norm(t.status) === status)\n    .map((t) => ({\n      task_id: t.task_id,\n      task_name: t.task_name,\n      assignee: t.assignee,\n      sprint: t.sprint,\n      due_date: t.due_date,\n    }));\n\n// Blocked: reason is taken verbatim from the description, never inferred.\nconst blocked = scopedTasks\n  .filter((t) => norm(t.status) === 'Blocked')\n  .map((t) => {\n    const desc = String(t.description || '');\n    const marker = desc.indexOf('BLOCKED');\n    return {\n      task_id: t.task_id,\n      task_name: t.task_name,\n      assignee: t.assignee,\n      due_date: t.due_date,\n      blocking_reason: marker >= 0 ? desc.slice(marker) : desc,\n      days_to_due: t.due_date ? daysBetween(referenceDate, t.due_date) : null,\n    };\n  });\n\n// Overdue: open work whose due date has passed as of the reference date.\nconst overdue = scopedTasks\n  .filter((t) => {\n    const s = norm(t.status);\n    if (s === 'Done' || !t.due_date) return false;\n    return daysBetween(referenceDate, t.due_date) < 0;\n  })\n  .map((t) => ({\n    task_id: t.task_id,\n    task_name: t.task_name,\n    status: t.status,\n    assignee: t.assignee,\n    due_date: t.due_date,\n    days_overdue: Math.abs(daysBetween(referenceDate, t.due_date)),\n  }));\n\n// ---------- sprint scoping ----------\nconst sprintTasks = sprintFilter\n  ? tasks\n      .filter((t) => norm(t.sprint) === norm(sprintFilter))\n      .map((t) => ({\n        task_id: t.task_id,\n        task_name: t.task_name,\n        status: t.status,\n        assignee: t.assignee,\n        priority: t.priority,\n        due_date: t.due_date,\n        description: t.description,\n      }))\n  : [];\n\nconst sprintCounts = sprintTasks.reduce((acc, t) => {\n  const s = norm(t.status);\n  acc[s] = (acc[s] || 0) + 1;\n  return acc;\n}, {});\nif (sprintFilter) sprintCounts.Total = sprintTasks.length;\n\n// ---------- assignee load ----------\nconst assigneeLoad = Object.entries(\n  tasks.reduce((acc, t) => {\n    const a = norm(t.assignee) || 'Unassigned';\n    acc[a] = (acc[a] || 0) + 1;\n    return acc;\n  }, {})\n)\n  .map(([assignee, task_count]) => ({ assignee, task_count }))\n  .sort((a, b) => b.task_count - a.task_count);\n\n// ---------- milestone windows ----------\n// Week numbers converted to dates using the declared anchor. Week 1 starts at the anchor.\nconst milestones = phases.map((p) => {\n  const startDate = addWeeks(projectStartAnchor, Number(p.start_week) - 1);\n  const endDate = addWeeks(projectStartAnchor, Number(p.end_week));\n  return {\n    phase: p.phase,\n    phase_name: p.phase_name,\n    start_week: p.start_week,\n    end_week: p.end_week,\n    window_start: startDate,\n    window_end: endDate,\n    days_to_window_end: daysBetween(referenceDate, endDate),\n    milestones: p.milestones_deliverables,\n    key_activities: p.key_activities,\n    source: `project_timeline.csv P${p.phase}`,\n  };\n});\n\nconst upcomingMilestones = milestones.filter(\n  (m) => m.days_to_window_end >= 0 && m.days_to_window_end <= horizonDays\n);\n\n// ---------- risks ----------\nconst riskRows = risks.map((r) => ({\n  risk_id: r.risk_id,\n  category: r.category,\n  risk: r.risk_challenge,\n  impact: r.impact,\n  mitigation: r.mitigation_strategy,\n  source: `project_risks.csv ${r.risk_id}`,\n}));\n\n// ---------- health (mechanical rule, not model judgement) ----------\nconst health =\n  blocked.length > 0 ? 'Red' : overdue.length > 0 ? 'Amber' : 'Green';\nconst healthRule =\n  blocked.length > 0\n    ? 'Red: at least one task is Blocked'\n    : overdue.length > 0\n    ? 'Amber: tasks overdue, none blocked'\n    : 'Green: nothing blocked or overdue';\n\n// ---------- assemble CONTEXT ----------\nconst context = {\n  meta: {\n    reference_date: referenceDate,\n    project_start_anchor: projectStartAnchor,\n    horizon_days: horizonDays,\n    sprint_filter: sprintFilter,\n    note:\n      'All figures below are precomputed. Agents must repeat them exactly and must not recalculate.',\n  },\n  counts,\n  tasks_by_status: {\n    Done: byStatus('Done'),\n    'In Progress': byStatus('In Progress'),\n    'To Do': byStatus('To Do'),\n    Blocked: byStatus('Blocked'),\n  },\n  blocked,\n  overdue,\n  sprint: sprintFilter ? { name: sprintFilter, counts: sprintCounts, tasks: sprintTasks } : null,\n  assignee_load: assigneeLoad,\n  milestones,\n  upcoming_milestones: upcomingMilestones,\n  risks: riskRows,\n  health: { rating: health, rule_applied: healthRule },\n};\n\nreturn [{ json: { context, context_text: JSON.stringify(context, null, 2) } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -112
+      ],
+      "id": "dbf37e49-2060-4750-b282-8c58e324ca37",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=CONTEXT:\n{{ $json.context_text }}\n\nREQUEST: What milestones are coming up in the next 2 weeks?",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "ROLE: You are a project milestone monitor. You report which milestones are upcoming or at risk, based on precomputed comparisons between the timeline and current task progress.  INPUT: A CONTEXT block containing timeline records, precomputed milestone window dates derived from the declared project start anchor, the reference date, the horizon in days, and precomputed lists of blocked and overdue tasks.  OUTPUT: Return a Markdown digest:  ## Milestone Digest — as of [reference date], horizon [n] days **Date anchor:** [project start anchor used, stated explicitly]  **Upcoming milestones:** | Phase | Milestone | Window | Days out | Source | |---|---|---|---|---|  **At risk:** | Milestone / Task | Why flagged | Suggested action | Source | |---|---|---|---|  **Blocked:** | Task ID | Name | Blocking reason | Days blocked | |---|---|---|---|  If nothing is upcoming or at risk, state so explicitly rather than leaving a table empty.  GLOBAL RULES: 1. Use ONLY facts present in the CONTEXT block. Your own knowledge is NOT a valid source. 2. Every item you output must carry a source reference. 3. Do NOT compute dates, day counts, or comparisons yourself — all figures are supplied precomputed in CONTEXT. Repeat them exactly. 4. Do NOT soften, dramatise, or editorialise.  INSUFFICIENT INPUT RULE (check this FIRST): If CONTEXT lacks a reference date OR a project start anchor, your entire response must be exactly:  INSUFFICIENT_INPUT I cannot assess milestone timing without: - A reference date (\"as of\" date) - A project start anchor to convert timeline week numbers into dates Please supply these and I will produce the digest.  A response consisting of only the first line is incomplete and incorrect — include the full text above. Return nothing else.  ADDITIONAL RULES: 1. Report ONLY milestones present in the timeline records. Never invent one, however standard it would be. 2. Use ONLY the supplied window dates and day counts. 3. Always state the date anchor you were given. 4. Do not manufacture a concern to fill the \"at risk\" section if CONTEXT shows nothing at risk."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        480,
+        -112
+      ],
+      "id": "81725b17-846f-45ff-8f4e-c3148877d448",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        128
+      ],
+      "id": "516c48ca-fbc1-4301-9a5a-2260ac99a137",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "iZ1dK6dLBcZMgOcg",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_timeline.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -432,
+        128
+      ],
+      "id": "7aca35d3-e15b-4e08-96af-26102e080737",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -272,
+        128
+      ],
+      "id": "9cd1c5e7-482e-4e1c-8a3c-3e4eacd96e0b",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -32,
+        -112
+      ],
+      "id": "86924b00-6dc4-435c-9ae1-2ef3c49a3c49",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "55e988dd-9724-48bf-b9e3-d17c0398622d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7bc8c12b2a42c57cad2eea9895a654c75d9f472af67d790604c3889ccb4e02f"
+  },
+  "nodeGroups": [],
+  "id": "wtJcsZCed5XbAbf0",
+  "tags": []
+}
