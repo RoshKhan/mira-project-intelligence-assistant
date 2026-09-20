@@ -1,15 +1,15 @@
 {
-  "name": "Mira — Milestone Tracker",
+  "name": "Mira — Status Reporter",
   "nodes": [
     {
       "parameters": {},
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -688,
-        -112
+        -928,
+        -16
       ],
-      "id": "f5776387-b90f-4bf7-8c77-b2058a770b12",
+      "id": "cec54476-75cd-45d3-a258-08cffa763883",
       "name": "When clicking ‘Execute workflow’"
     },
     {
@@ -20,10 +20,10 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        -448,
-        -112
+        -736,
+        -16
       ],
-      "id": "cd61f243-61f6-4b4d-b078-9f16c508eb1a",
+      "id": "11b79a51-ff47-4ba7-aa85-299ebc3ffbe0",
       "name": "Read/Write Files from Disk"
     },
     {
@@ -33,10 +33,10 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        -240,
-        -112
+        -528,
+        -16
       ],
-      "id": "65e3028c-cfd0-43ba-9a08-a32751c50832",
+      "id": "a8472495-b548-4519-9d5f-66d81138deb9",
       "name": "Extract from File"
     },
     {
@@ -46,20 +46,20 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        256,
-        -112
+        -112,
+        -16
       ],
-      "id": "dbf37e49-2060-4750-b282-8c58e324ca37",
+      "id": "571367ab-2116-4335-b7b4-384f43e9b38d",
       "name": "Code in JavaScript"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=CONTEXT:\n{{ $json.context_text }}\n\nREQUEST: What milestones are coming up in the next 2 weeks?",
+        "text": "=CONTEXT:\n{{ $json.context_text }}\n\n   REQUEST: Summarize the current project status: how many tasks are done, in progress, to do, and blocked?",
         "messages": {
           "messageValues": [
             {
-              "message": "ROLE: You are a project milestone monitor. You report which milestones are upcoming or at risk, based on precomputed comparisons between the timeline and current task progress.  INPUT: A CONTEXT block containing timeline records, precomputed milestone window dates derived from the declared project start anchor, the reference date, the horizon in days, and precomputed lists of blocked and overdue tasks.  OUTPUT: Return a Markdown digest:  ## Milestone Digest — as of [reference date], horizon [n] days **Date anchor:** [project start anchor used, stated explicitly]  **Upcoming milestones:** | Phase | Milestone | Window | Days out | Source | |---|---|---|---|---|  **At risk:** | Milestone / Task | Why flagged | Suggested action | Source | |---|---|---|---|  **Blocked:** | Task ID | Name | Blocking reason | Days blocked | |---|---|---|---|  If nothing is upcoming or at risk, state so explicitly rather than leaving a table empty.  GLOBAL RULES: 1. Use ONLY facts present in the CONTEXT block. Your own knowledge is NOT a valid source. 2. Every item you output must carry a source reference. 3. Do NOT compute dates, day counts, or comparisons yourself — all figures are supplied precomputed in CONTEXT. Repeat them exactly. 4. Do NOT soften, dramatise, or editorialise.  INSUFFICIENT INPUT RULE (check this FIRST): If CONTEXT lacks a reference date OR a project start anchor, your entire response must be exactly:  INSUFFICIENT_INPUT I cannot assess milestone timing without: - A reference date (\"as of\" date) - A project start anchor to convert timeline week numbers into dates Please supply these and I will produce the digest.  A response consisting of only the first line is incomplete and incorrect — include the full text above. Return nothing else.  ADDITIONAL RULES: 1. Report ONLY milestones present in the timeline records. Never invent one, however standard it would be. 2. Use ONLY the supplied window dates and day counts. 3. Always state the date anchor you were given. 4. Do not manufacture a concern to fill the \"at risk\" section if CONTEXT shows nothing at risk."
+              "message": "ROLE: You are a project status reporter. You narrate precomputed task figures into a structured weekly status report. You never calculate anything yourself.  INPUT: A CONTEXT block containing precomputed aggregates (counts by status, blocked items, overdue items, sprint filter applied, reference date) and the underlying task records for the scope requested (task ID, name, status, assignee, priority, sprint, due date, description).  OUTPUT: Return a Markdown status report:  ## Status Report — [scope: sprint or date range] (as of [reference date])  **Summary:** [one sentence stating overall health, justified by the figures]  **Counts:** Done [n] · In Progress [n] · To Do [n] · Blocked [n] · Total [n] (figures exactly as supplied in CONTEXT)  **Completed:** [task ID and name for each] **In progress:** [task ID, name, assignee, due date] **Blocked:** [task ID, name, and the blocking reason exactly as stated in the task record] **Overdue / at risk:** [task ID, name, due date, days overdue as supplied]  **Health:** Green | Amber | Red — [one sentence, justified only by blocked and overdue counts]  Every task line carries its task ID as its source reference.  GLOBAL RULES: 1. Use ONLY facts present in the CONTEXT block. Your own knowledge of project management,    logistics, or AI is NOT a valid source. If it is not in CONTEXT, it does not exist. 2. Every item you output must carry a source reference: the file name and the row ID,    phase number, or task ID it came from. An item you cannot cite must not be output. 3. Do NOT compute totals, counts, percentages, or date differences. All figures are supplied    to you precomputed in CONTEXT. Repeat them exactly. Never adjust or re-derive them. 4. Do NOT soften, dramatise, or editorialise. Report what the data says.  ADDITIONAL RULES: 1. Report ONLY the counts supplied in CONTEXT. Do not add, re-derive, or sanity-check them.    If a count looks wrong to you, report it as supplied. 2. Do NOT state a completion percentage unless it is supplied precomputed. 3. Do NOT include tasks outside the requested scope. If the scope is Sprint 3, tasks from    Sprint 2 or Sprint 4 must not appear. 4. Quote blocking reasons verbatim from the task record. Do not speculate about causes or    resolution. 5. Health rating rules: Red if any task is Blocked; Amber if any task is overdue but none    blocked; Green otherwise. State which rule applied.  INSUFFICIENT INPUT RULE: If CONTEXT contains no task records and no precomputed aggregates, return EXACTLY:  INSUFFICIENT_INPUT No task board data is available, so I cannot produce a status report. Please supply a task board export containing task IDs, names, statuses, assignees, and due dates.  Return nothing else. Do not estimate progress, invent task statuses, or describe the project in general terms."
             }
           ]
         },
@@ -68,10 +68,10 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        480,
-        -112
+        96,
+        -16
       ],
-      "id": "81725b17-846f-45ff-8f4e-c3148877d448",
+      "id": "913da39b-be15-44d3-9ce0-d270b8db100c",
       "name": "Basic LLM Chain"
     },
     {
@@ -83,15 +83,17 @@
           "cachedResultName": "gpt-4o-mini"
         },
         "builtInTools": {},
-        "options": {}
+        "options": {
+          "temperature": 0.2
+        }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        512,
-        128
+        16,
+        192
       ],
-      "id": "516c48ca-fbc1-4301-9a5a-2260ac99a137",
+      "id": "318dd51f-f38e-402c-84fc-acc86c9b5c80",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -102,48 +104,34 @@
     },
     {
       "parameters": {
-        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_timeline.csv",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2131962-90d3-4a69-a1a3-c9dc8622b392",
+              "name": "filterSprint",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
         "options": {}
       },
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        -432,
-        128
+        -320,
+        -16
       ],
-      "id": "7aca35d3-e15b-4e08-96af-26102e080737",
-      "name": "Read/Write Files from Disk1"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
-      "position": [
-        -272,
-        128
-      ],
-      "id": "9cd1c5e7-482e-4e1c-8a3c-3e4eacd96e0b",
-      "name": "Extract from File1"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        -32,
-        -112
-      ],
-      "id": "86924b00-6dc4-435c-9ae1-2ef3c49a3c49",
-      "name": "Merge"
+      "id": "71f56ba5-da4f-4a9b-8bb4-940d5490284a",
+      "name": "Edit Fields"
     },
     {
       "parameters": {
         "workflowInputs": {
           "values": [
             {
-              "name": "requesttext"
+              "name": "requestText"
             }
           ]
         }
@@ -151,10 +139,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -720,
-        128
+        -928,
+        256
       ],
-      "id": "9199fb24-e915-4e48-bd05-77e82f283847",
+      "id": "10787d92-7a36-4009-978e-1e26070bd4d5",
       "name": "When Executed by Another Workflow"
     }
   ],
@@ -163,11 +151,6 @@
     "When clicking ‘Execute workflow’": {
       "main": [
         [
-          {
-            "node": "Read/Write Files from Disk1",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "Read/Write Files from Disk",
             "type": "main",
@@ -191,7 +174,7 @@
       "main": [
         [
           {
-            "node": "Merge",
+            "node": "Edit Fields",
             "type": "main",
             "index": 0
           }
@@ -220,29 +203,7 @@
         ]
       ]
     },
-    "Read/Write Files from Disk1": {
-      "main": [
-        [
-          {
-            "node": "Extract from File1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract from File1": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge": {
+    "Edit Fields": {
       "main": [
         [
           {
@@ -260,11 +221,6 @@
             "node": "Read/Write Files from Disk",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Read/Write Files from Disk1",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -276,12 +232,12 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "b6a16e64-0bf2-40f8-b5c7-92fa287ccb42",
+  "versionId": "0e1ce454-21ae-4436-8c21-7ffc36292a79",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "a7bc8c12b2a42c57cad2eea9895a654c75d9f472af67d790604c3889ccb4e02f"
   },
   "nodeGroups": [],
-  "id": "wtJcsZCed5XbAbf0",
+  "id": "KmR35DFrTDiLGrTk",
   "tags": []
 }

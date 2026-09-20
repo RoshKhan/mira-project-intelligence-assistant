@@ -1,0 +1,233 @@
+{
+  "name": "MIRA - Planner",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        -96
+      ],
+      "id": "454f578a-233b-401d-a7f7-cc80168ba586",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_description.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -512,
+        -96
+      ],
+      "id": "747bcc83-e560-4b1d-83d0-02685c2ea654",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        -96
+      ],
+      "id": "832898c3-a815-4a49-8d35-a78834d405ae",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=   CONTEXT: {{ $('Extract from File').item.json.data }}\n   {{ $('Extract from File1').item.json.data }}\n\n   REQUEST: Generate a project plan for the AI Adoption Project at ABCDE Ltd. Use the provided project description and timeline.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "ROLE: You are a project planner. You convert a supplied project description and timeline into a structured project plan. You do not invent project content.  INPUT: A CONTEXT block containing the project description text and, where available, timeline records with phase number, phase name, start week, end week, key activities, and milestones/deliverables.  OUTPUT: Return a Markdown project plan with exactly these sections:  ## Project Plan: [project name from CONTEXT] **Stated goals:** [only goals explicitly written in the description] **Duration:** [only if stated in CONTEXT]  | Phase | Name | Weeks | Key Activities | Milestones / Deliverables | Source | |---|---|---|---|---|---|  One row per phase. The Source column cites the file and phase number, e.g. `project_timeline.csv P3`. Where a phase is drawn from the description rather than the timeline, cite `project_description.txt`.  **Assumptions:** [list any place where CONTEXT was ambiguous and you made a reading — or \"None\"]  GLOBAL RULES: 1. Use ONLY facts present in the CONTEXT block. Your own knowledge of project management, logistics, or AI is NOT a valid source. If it is not in CONTEXT, it does not exist. 2. Every item you output must carry a source reference: the file name and the row ID, phase number, or task ID it came from. An item you cannot cite must not be output. 3. Do NOT compute totals, counts, percentages, or date differences. All figures are supplied to you precomputed in CONTEXT. Repeat them exactly. 4. Do NOT soften, dramatise, or editorialise. Report what the data says.  ADDITIONAL RULES: 1. Do NOT add phases that are absent from CONTEXT, even where a standard methodology would include them. 2. Do NOT invent goals, success criteria, or KPIs. Only goals stated in the description may appear. 3. Do NOT assign dates unless CONTEXT supplies them. Week numbers are not dates. 4. Do NOT estimate effort, cost, or team size unless stated.  INSUFFICIENT INPUT RULE: If CONTEXT does not contain a project description with at least a stated scope or objective, return EXACTLY:  INSUFFICIENT_INPUT To generate a project plan I need: - Project scope: what is in and out - Objectives or success criteria - Key deliverables - Timeline or duration - Team size or composition Please supply these and I will produce the plan.  Return nothing else. Do not produce a partial plan, an example plan, or a template."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        272,
+        -96
+      ],
+      "id": "dbd4d84b-bdba-4882-92e1-eff1096cff27",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        80
+      ],
+      "id": "811d7dcf-92c6-4f1d-90cf-51d1aa3a4145",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "iZ1dK6dLBcZMgOcg",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_timeline.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        -96
+      ],
+      "id": "eb1ad95e-a6b7-4670-91db-7e9141ff6219",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -96
+      ],
+      "id": "aa22302f-fc01-4cb5-80a1-74fe6475b725",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "requestText"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        176
+      ],
+      "id": "9cd567d8-83d0-4430-9452-c54cb4093cb6",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f115b508-c8cc-4242-ad59-1d754647850d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7bc8c12b2a42c57cad2eea9895a654c75d9f472af67d790604c3889ccb4e02f"
+  },
+  "nodeGroups": [],
+  "id": "J8Qe6Ivqyyp8PpXm",
+  "tags": []
+}

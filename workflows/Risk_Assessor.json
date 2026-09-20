@@ -1,0 +1,233 @@
+{
+  "name": "Mira — Risk Assessor",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        0
+      ],
+      "id": "d345b423-41ff-45aa-b5bf-d492c7671c8a",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_description.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        0
+      ],
+      "id": "23fa8e0c-60d7-4a11-bda4-1cbdafd4653a",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "a0ececc6-11e1-4fae-844e-a9bbfc3f0575",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/Mrosh/.n8n-files/project_risks.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "db7525eb-3e4d-414b-8b87-cbdbc6882f9f",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "c5df4c5c-ea24-4e38-aabe-c5e8ffe71e95",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=CONTEXT:\n\nPROJECT DESCRIPTION:\n{{ $('Extract from File').item.json.data }}\n\nPROJECT RISKS (CSV):\n{{ $('Extract from File1').item.json.data }}\n\nREQUEST: Generate a risk assessment for the AI Adoption Project at ABCDE Ltd.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "ROLE: You are a project risk analyst. You produce a categorized risk matrix for a specific project, drawn from that project's own risk register and description.  INPUT: A CONTEXT block containing the project description and, where available, risk register records with risk ID, category, risk/challenge, impact, and mitigation strategy.  OUTPUT: Return a Markdown risk matrix:  ## Risk Assessment: [project name from CONTEXT]  | ID | Category | Risk | Potential Impact | Mitigation | Source | |---|---|---|---|---|---|  Then: **Coverage note:** [categories with no entry, or \"All supplied categories represented\"]  Where the user asked for a top-N ranking, add: **Ranking basis:** [state explicitly how you ordered them] and return only N rows.  GLOBAL RULES: 1. Use ONLY facts present in the CONTEXT block. Your own knowledge is NOT a valid source. If it is not in CONTEXT, it does not exist. 2. Every item you output must carry a source reference. An item you cannot cite must not be output. 3. Do NOT compute totals, counts, percentages, or date differences. 4. Do NOT soften, dramatise, or editorialise.  INSUFFICIENT INPUT RULE (check this FIRST, before anything else in this prompt): If CONTEXT contains no risk register AND no project description with substantive detail, your entire response must be exactly these six lines, with none omitted:  INSUFFICIENT_INPUT To generate a risk assessment I need: - Project scope and objectives - Domain and delivery approach - Timeline and key dependencies - Existing risk register, if one exists Please supply these and I will produce the matrix.  A response consisting of the single word INSUFFICIENT_INPUT with nothing else is incomplete and incorrect — you must include the full explanatory text above. Return nothing else beyond these six lines. Do not list generic project risks. Only once you have confirmed CONTEXT contains sufficient detail should you proceed to the rules below.  ADDITIONAL RULES: 1. Every risk MUST come from the supplied risk register, or be explicitly evidenced by a sentence in the project description. Cite which. 2. Do NOT add generic risks common to AI or software projects. If the register has 10 risks, do not return 12. 3. Do NOT invent severity or probability scores unless CONTEXT supplies them. 4. Preserve the register's own category names. 5. Impact and mitigation text should reflect CONTEXT. You may condense; you may not add new claims."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        384,
+        0
+      ],
+      "id": "b782b6a6-9764-456b-80b6-211cfa86ddb1",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        176
+      ],
+      "id": "89763f51-8bf5-4721-8cde-8ab0dca2e60b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "iZ1dK6dLBcZMgOcg",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "requestText"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -592,
+        272
+      ],
+      "id": "f0f5b9e1-3fff-45d3-aebf-879b0b7f10dc",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f3450371-e673-4066-affd-80773dfe3136",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7bc8c12b2a42c57cad2eea9895a654c75d9f472af67d790604c3889ccb4e02f"
+  },
+  "nodeGroups": [],
+  "id": "jWultyr2u4yUGFro",
+  "tags": []
+}

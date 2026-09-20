@@ -1,0 +1,516 @@
+{
+  "name": "Mira — Router",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        -112
+      ],
+      "id": "a8cef514-feab-41d4-827e-69ae794a0014",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e31ff26c-c449-47bd-bf41-fd11c28919fc",
+              "name": "requestText",
+              "value": "New project starting soon.",
+              "type": "string"
+            },
+            {
+              "id": "2af84cd2-bcdc-4a1b-8222-12095c86354d",
+              "name": "manifest",
+              "value": "   project_description.txt, project_timeline.csv, project_risks.csv, sample_task_board.csv are all loaded and available.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -336,
+        -112
+      ],
+      "id": "23558744-9f2e-4a44-a375-e7e6fd21d4b1",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=   REQUEST: {{ $json.requestText }}\n   FILE MANIFEST: {{ $json.manifest }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "## 1. Orchestrator / Router  ``` ROLE: You are a request classifier for Mira, a project intelligence assistant. You do not generate content. Your only job is to determine what the user is asking for and whether the required data is present.  INPUT: A user request in natural language, plus a manifest listing which source files are currently loaded.  OUTPUT: Return ONLY this JSON object, no prose before or after: {   \"intent\": \"PLAN\" | \"RISK\" | \"STATUS\" | \"MILESTONE\" | \"STAKEHOLDER_UPDATE\" | \"INSUFFICIENT\",   \"target_agent\": \"planner\" | \"risk_assessor\" | \"status_reporter\" | \"milestone_tracker\" | \"stakeholder_update\" | \"none\",   \"required_files\": [list of file names this request needs],   \"parameters\": { \"sprint\": string or null, \"horizon_days\": number or null, \"audience\": \"leadership\" | \"engineering\" | \"client\" | null },   \"missing\": [list of required fields or files that are absent],   \"reason\": \"one sentence explaining the classification\" }  INTENT DEFINITIONS: - PLAN — asks to generate, draft, or structure a project plan. Requires: project description. - RISK — asks for risks, a risk assessment, a risk matrix, or top-N risks. Requires: project   description and/or risk register. - STATUS — asks for a status report, progress summary, or counts of task states. Requires:   task board. - MILESTONE — asks what is upcoming, what is blocked, what is at risk, or what may slip.   Requires: task board and timeline. - STAKEHOLDER_UPDATE — asks for an update, email, or summary addressed to a named audience.   Requires: task board. - INSUFFICIENT — the request is too vague to classify, OR a required file is not loaded, OR   the request names no project and supplies no data.  RULES: 1. Classify from the request text and the file manifest only. Do not attempt to answer the    request yourself. 2. If a request maps to a valid intent but its required file is not in the manifest, return    intent \"INSUFFICIENT\" and list the missing file. A valid question with no data is still    insufficient. 3. If the request is one short sentence with no project named and no data referenced, return    \"INSUFFICIENT\". Do not guess an intent to keep the pipeline moving. 4. Extract sprint, horizon, and audience parameters only if explicitly stated. Never infer them. 5. Return exactly one intent. If a request spans two intents, choose the primary one and note    the second in \"reason\".  INSUFFICIENT INPUT RULE: When intent is \"INSUFFICIENT\", set target_agent to \"none\" and populate \"missing\" with the specific fields or files needed. Never route an underspecified request to a generating agent. ```"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -144,
+        -112
+      ],
+      "id": "2dd9ff38-1db7-483e-ac51-37b6d5129eb4",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        96
+      ],
+      "id": "82b4e7ea-4179-4ceb-b3ea-622acecc4a64",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "iZ1dK6dLBcZMgOcg",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "   const raw = $input.item.json.text;\n   const cleaned = raw.replace(/```json|```/g, '').trim();\n   const parsed = JSON.parse(cleaned);\n   return { json: parsed };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -112
+      ],
+      "id": "f0b3791e-2b79-43b1-96a6-244cf6b12b71",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.target_agent }}",
+                    "rightValue": "=planner",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "21165c04-e0d1-4691-9a36-966f91ff577c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c2e2a089-ec26-4ee7-898b-fa02fe8f3b4c",
+                    "leftValue": "={{ $json.target_agent}}",
+                    "rightValue": "risk_assessor",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ac622da8-331e-492e-86dd-f5469d0d48f8",
+                    "leftValue": "={{ $json.target_agent }}",
+                    "rightValue": "status_reporter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2655be28-6774-418b-9206-c4c1b0265dbc",
+                    "leftValue": "={{ $json.target_agent }}",
+                    "rightValue": "milestone_tracker",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        -160
+      ],
+      "id": "ac3b4b74-4594-40ad-95a3-0bcec71426c4",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "J8Qe6Ivqyyp8PpXm",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/J8Qe6Ivqyyp8PpXm",
+          "cachedResultName": "MIRA - Planner"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "requestText"
+          ],
+          "schema": [
+            {
+              "id": "requestText",
+              "displayName": "requestText",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        656,
+        -320
+      ],
+      "id": "ddf20f75-d926-41b3-b45b-74b971639c2d",
+      "name": "Call 'MIRA - Planner'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "jWultyr2u4yUGFro",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jWultyr2u4yUGFro",
+          "cachedResultName": "Mira — Risk Assessor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "requestText"
+          ],
+          "schema": [
+            {
+              "id": "requestText",
+              "displayName": "requestText",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        -144
+      ],
+      "id": "48da0195-d3d4-4ce3-9e40-9e50cfeb6bf7",
+      "name": "Call 'Mira — Risk Assessor'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KmR35DFrTDiLGrTk",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/KmR35DFrTDiLGrTk",
+          "cachedResultName": "Mira — Status Reporter"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "requestText"
+          ],
+          "schema": [
+            {
+              "id": "requestText",
+              "displayName": "requestText",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        800,
+        16
+      ],
+      "id": "2d041bdb-6e94-427d-96fe-4799623a193c",
+      "name": "Call 'Mira — Status Reporter'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wtJcsZCed5XbAbf0",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/wtJcsZCed5XbAbf0",
+          "cachedResultName": "Mira — Milestone Tracker"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "requesttext"
+          ],
+          "schema": [
+            {
+              "id": "requesttext",
+              "displayName": "requesttext",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        144
+      ],
+      "id": "d33987dd-0bee-485c-9371-6dff89e09fc2",
+      "name": "Call 'Mira — Milestone Tracker'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d02673a3-fe0d-46d1-83ea-be96c873a888",
+              "name": "response",
+              "value": "=   {{ $json.reason }} Missing: {{ $json.missing.join(', ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        496,
+        160
+      ],
+      "id": "1d0ba819-dc49-452e-a120-12109a1cd78b",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Call 'MIRA - Planner'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Mira — Risk Assessor'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Mira — Status Reporter'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'Mira — Milestone Tracker'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d7e6c0cc-8175-47c1-8046-77caa036f09b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7bc8c12b2a42c57cad2eea9895a654c75d9f472af67d790604c3889ccb4e02f"
+  },
+  "nodeGroups": [],
+  "id": "B4cDvRov6FD4mVWS",
+  "tags": []
+}
