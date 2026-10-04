@@ -38,7 +38,8 @@ Full detail: [`docs/Baseline_Test_Results.md`](docs/Baseline_Test_Results.md)
 |---|---|
 | `workflows/` | Exported n8n workflows: `Router.json`, `Planner.json`, `Risk_Assessor.json`, `Status_Reporter.json`, `Milestone_Tracker.json`, plus `data_prep_code_node.js` |
 | `data/` | The ABCDE Ltd. input files: project description, timeline, risk register, sample task board, baseline test inputs |
-| `docs/Mira_Architecture_Writeup.docx` | Q2 architecture writeup (tools, pattern, agents, cost, metrics, testing) |
+| `docs/Mira_Architecture_Writeup.docx` | Q2 architecture writeup, 2 pages (tools, pattern, agents, cost, metrics, testing) |
+| `docs/Mira_Architecture_Writeup_Full.docx` | Longer appendix version of the writeup with fuller agent descriptions and fix-by-fix testing notes |
 | `docs/Mira_Program_Charter_Q3.docx` | Q3 program charter |
 | `docs/Mira_Reflection_Q4.docx` | Q4 reflection and next steps |
 | `docs/Mira_Capstone_Deck.pptx` | Slide deck: problem, approach, outcomes |
